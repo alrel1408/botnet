@@ -25,6 +25,7 @@ class DDoSSimulator:
         self.target_port = config.SIMULATOR_CONFIG['target_port']
         self.duration = config.SIMULATOR_CONFIG['attack_duration']
         self.packets_per_second = config.SIMULATOR_CONFIG['packets_per_second']
+        self.number_of_bots = 1  # Default 1 bot
         self.running = False
         self.attack_stats = {
             'packets_sent': 0,
@@ -50,7 +51,9 @@ class DDoSSimulator:
         """Pilih target IP secara interaktif"""
         console.print("\n[bold cyan]=== PILIH TARGET IP ===[/bold cyan]")
         console.print("[yellow]⚠️  PERINGATAN: Jangan pilih IP yang bisa membuat sistem crash![/yellow]")
-        console.print("[yellow]Hindari: localhost (127.0.0.1), IP PC sendiri, atau server penting![/yellow]\n")
+        console.print("[yellow]Hindari: localhost (127.0.0.1), IP PC sendiri, atau server penting![/yellow]")
+        console.print("[red]🚫 JANGAN PERNAH pilih IP eksternal/public - ini ILEGAL![/red]")
+        console.print("[green]✅ Hanya gunakan IP lokal: 192.168.x.x, 10.x.x.x, 172.16-31.x.x[/green]\n")
         
         # Tampilkan pilihan safe targets
         if self.safe_targets:
@@ -132,12 +135,18 @@ class DDoSSimulator:
         if ip.startswith('127.'):
             return True
         
-        # Cek private network ranges yang bisa berbahaya
+        # Cek IP eksternal (public IP) - BLOCK!
+        if not (ip.startswith('10.') or ip.startswith('192.168.') or ip.startswith('172.')):
+            console.print(f"[red]❌ PERINGATAN: IP {ip} adalah IP PUBLIK/EKSTERNAL![/red]")
+            console.print("[red]JANGAN PERNAH attack IP eksternal - ini ILEGAL![/red]")
+            return True
+        
+        # Cek private network ranges yang aman
         if ip.startswith('10.') or ip.startswith('192.168.') or ip.startswith('172.'):
             # Tanya user untuk konfirmasi
             return False  # Allow dengan warning
         
-        return False
+        return True  # Default block
     
     def select_port(self):
         """Pilih port target secara interaktif"""
@@ -220,7 +229,70 @@ class DDoSSimulator:
         
         return service_names.get(port, 'Unknown')
     
-    def syn_flood_attack(self):
+    def configure_attack_parameters(self):
+        """Konfigurasi parameter serangan secara interaktif"""
+        console.print("\n[bold cyan]=== KONFIGURASI PARAMETER SERANGAN ===[/bold cyan]")
+        
+        # Konfigurasi durasi
+        while True:
+            try:
+                duration_input = input(f"Durasi serangan dalam detik (default: {self.duration}): ").strip()
+                if duration_input:
+                    new_duration = int(duration_input)
+                    if 1 <= new_duration <= 3600:  # Max 1 jam
+                        self.duration = new_duration
+                        console.print(f"[green]✅ Durasi diset: {new_duration} detik[/green]")
+                        break
+                    else:
+                        console.print("[red]❌ Durasi harus antara 1-3600 detik![/red]")
+                else:
+                    console.print(f"[blue]Menggunakan default durasi: {self.duration} detik[/blue]")
+                    break
+            except ValueError:
+                console.print("[red]❌ Durasi harus berupa angka![/red]")
+        
+        # Konfigurasi paket per detik
+        while True:
+            try:
+                pps_input = input(f"Paket per detik (default: {self.packets_per_second}): ").strip()
+                if pps_input:
+                    new_pps = int(pps_input)
+                    if 1 <= new_pps <= 1000:  # Max 1000 paket/detik
+                        self.packets_per_second = new_pps
+                        console.print(f"[green]✅ Paket/detik diset: {new_pps}[/green]")
+                        break
+                    else:
+                        console.print("[red]❌ Paket/detik harus antara 1-1000![/red]")
+                else:
+                    console.print(f"[blue]Menggunakan default: {self.packets_per_second} paket/detik[/blue]")
+                    break
+            except ValueError:
+                console.print("[red]❌ Paket/detik harus berupa angka![/red]")
+        
+        # Konfigurasi jumlah bot
+        while True:
+            try:
+                bots_input = input(f"Jumlah bot/thread (default: {self.number_of_bots}): ").strip()
+                if bots_input:
+                    new_bots = int(bots_input)
+                    if 1 <= new_bots <= 10:  # Max 10 bot untuk safety
+                        self.number_of_bots = new_bots
+                        console.print(f"[green]✅ Jumlah bot diset: {new_bots}[/green]")
+                        break
+                    else:
+                        console.print("[red]❌ Jumlah bot harus antara 1-10![/red]")
+                else:
+                    console.print(f"[blue]Menggunakan default: {self.number_of_bots} bot[/blue]")
+                    break
+            except ValueError:
+                console.print("[red]❌ Jumlah bot harus berupa angka![/red]")
+        
+        console.print(f"\n[bold green]Konfigurasi Final:[/bold green]")
+        console.print(f"  Durasi: {self.duration} detik")
+        console.print(f"  Paket/detik: {self.packets_per_second}")
+        console.print(f"  Jumlah Bot: {self.number_of_bots}")
+    
+    def syn_flood_attack(self, bot_name="SYN-Bot"):
         """Simulasi SYN Flood Attack"""
         try:
             while self.running:
@@ -242,7 +314,7 @@ class DDoSSimulator:
         except Exception as e:
             console.print(f"[red]Error dalam SYN Flood: {e}[/red]")
     
-    def udp_flood_attack(self):
+    def udp_flood_attack(self, bot_name="UDP-Bot"):
         """Simulasi UDP Flood Attack"""
         try:
             while self.running:
@@ -267,7 +339,7 @@ class DDoSSimulator:
         except Exception as e:
             console.print(f"[red]Error dalam UDP Flood: {e}[/red]")
     
-    def http_flood_attack(self):
+    def http_flood_attack(self, bot_name="HTTP-Bot"):
         """Simulasi HTTP Flood Attack"""
         try:
             while self.running:
@@ -319,9 +391,13 @@ Connection: keep-alive\r
         if self.enable_port_selection:
             self.select_port()
         
+        # Konfigurasi attack parameters
+        self.configure_attack_parameters()
+        
         console.print(f"\n[bold blue]Target:[/bold blue] {self.target_host}:{self.target_port}")
         console.print(f"[bold blue]Durasi:[/bold blue] {self.duration} detik")
         console.print(f"[bold blue]Paket/detik:[/bold blue] {self.packets_per_second}")
+        console.print(f"[bold blue]Jumlah Bot:[/bold blue] {self.number_of_bots}")
         console.print(f"[bold blue]Tipe Serangan:[/bold blue] {attack_type}\n")
         
         # Konfirmasi sebelum memulai
@@ -333,23 +409,26 @@ Connection: keep-alive\r
         self.running = True
         self.attack_stats['start_time'] = time.time()
         
-        # Buat thread untuk setiap tipe serangan
+        # Buat thread untuk setiap tipe serangan dengan multiple bots
         threads = []
         
         if attack_type == "syn" or attack_type == "mixed":
-            t1 = threading.Thread(target=self.syn_flood_attack)
-            threads.append(t1)
-            self.attack_stats['attack_types'].append('SYN Flood')
+            for i in range(self.number_of_bots):
+                t = threading.Thread(target=self.syn_flood_attack, args=(f"SYN-Bot-{i+1}",))
+                threads.append(t)
+                self.attack_stats['attack_types'].append('SYN Flood')
         
         if attack_type == "udp" or attack_type == "mixed":
-            t2 = threading.Thread(target=self.udp_flood_attack)
-            threads.append(t2)
-            self.attack_stats['attack_types'].append('UDP Flood')
+            for i in range(self.number_of_bots):
+                t = threading.Thread(target=self.udp_flood_attack, args=(f"UDP-Bot-{i+1}",))
+                threads.append(t)
+                self.attack_stats['attack_types'].append('UDP Flood')
         
         if attack_type == "http" or attack_type == "mixed":
-            t3 = threading.Thread(target=self.http_flood_attack)
-            threads.append(t3)
-            self.attack_stats['attack_types'].append('HTTP Flood')
+            for i in range(self.number_of_bots):
+                t = threading.Thread(target=self.http_flood_attack, args=(f"HTTP-Bot-{i+1}",))
+                threads.append(t)
+                self.attack_stats['attack_types'].append('HTTP Flood')
         
         # Jalankan semua thread
         for thread in threads:
@@ -372,7 +451,7 @@ Connection: keep-alive\r
                     progress.console.print(f"[green]Paket terkirim:[/green] {self.attack_stats['packets_sent']}")
                     progress.console.print(f"[green]Bytes terkirim:[/green] {self.attack_stats['bytes_sent']:,}")
                     progress.console.print(f"[green]Paket/detik:[/green] {pps:.2f}")
-                    progress.console.print(f"[green]Bytes/detik:[/green] {bps:.2f:,}")
+                    progress.console.print(f"[green]Bytes/detik:[/green] {bps:.2f}")
         
         # Stop semua thread
         self.running = False
@@ -387,13 +466,14 @@ Connection: keep-alive\r
         console.print(f"[blue]Total Paket:[/blue] {self.attack_stats['packets_sent']:,}")
         console.print(f"[blue]Total Bytes:[/blue] {self.attack_stats['bytes_sent']:,}")
         console.print(f"[blue]Durasi:[/blue] {self.duration} detik")
-        console.print(f"[blue]Tipe Serangan:[/blue] {', '.join(self.attack_stats['attack_types'])}")
+        console.print(f"[blue]Jumlah Bot:[/blue] {self.number_of_bots}")
+        console.print(f"[blue]Tipe Serangan:[/blue] {', '.join(set(self.attack_stats['attack_types']))}")
         
         if self.attack_stats['start_time'] > 0:
             elapsed = time.time() - self.attack_stats['start_time']
             console.print(f"[blue]Waktu Aktual:[/blue] {elapsed:.2f} detik")
             console.print(f"[blue]Rata-rata Paket/detik:[/blue] {self.attack_stats['packets_sent'] / elapsed:.2f}")
-            console.print(f"[blue]Rata-rata Bytes/detik:[/blue] {self.attack_stats['bytes_sent'] / elapsed:.2f:,}")
+            console.print(f"[blue]Rata-rata Bytes/detik:[/blue] {self.attack_stats['bytes_sent'] / elapsed:.2f}")
         
         console.print("\n[bold yellow]Simulasi selesai! Sekarang Anda bisa test sistem pertahanan Anda.[/bold yellow]")
 
