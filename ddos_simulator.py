@@ -32,6 +32,12 @@ class DDoSSimulator:
             'start_time': 0,
             'attack_types': []
         }
+        
+        # Target selection
+        self.safe_targets = config.SIMULATOR_CONFIG['safe_targets']
+        self.enable_target_selection = config.SIMULATOR_CONFIG['enable_target_selection']
+        self.enable_port_selection = config.SIMULATOR_CONFIG['enable_port_selection']
+        self.common_ports = config.SIMULATOR_CONFIG['common_ports']
     
     def show_banner(self):
         """Menampilkan banner aplikasi"""
@@ -39,6 +45,180 @@ class DDoSSimulator:
         console.print(Panel(banner, style="bold red"))
         console.print("[bold yellow]⚠️  PERINGATAN:[/bold yellow] Hanya untuk pembelajaran dan testing defensif!")
         console.print("[bold red]JANGAN PERNAH gunakan untuk menyerang sistem orang lain![/bold red]\n")
+    
+    def select_target(self):
+        """Pilih target IP secara interaktif"""
+        console.print("\n[bold cyan]=== PILIH TARGET IP ===[/bold cyan]")
+        console.print("[yellow]⚠️  PERINGATAN: Jangan pilih IP yang bisa membuat sistem crash![/yellow]")
+        console.print("[yellow]Hindari: localhost (127.0.0.1), IP PC sendiri, atau server penting![/yellow]\n")
+        
+        # Tampilkan pilihan safe targets
+        if self.safe_targets:
+            console.print("[bold green]Target yang aman untuk testing:[/bold green]")
+            for i, ip in enumerate(self.safe_targets, 1):
+                console.print(f"{i}. {ip}")
+            console.print(f"{len(self.safe_targets) + 1}. Custom IP (input manual)")
+            console.print(f"{len(self.safe_targets) + 2}. Gunakan default ({self.target_host})")
+            
+            choice = input(f"\nPilihan Anda (1-{len(self.safe_targets) + 2}): ")
+            
+            try:
+                choice_num = int(choice)
+                if 1 <= choice_num <= len(self.safe_targets):
+                    self.target_host = self.safe_targets[choice_num - 1]
+                    console.print(f"[green]✅ Target dipilih: {self.target_host}[/green]")
+                elif choice_num == len(self.safe_targets) + 1:
+                    self.input_custom_ip()
+                elif choice_num == len(self.safe_targets) + 2:
+                    console.print(f"[blue]Menggunakan default target: {self.target_host}[/blue]")
+                else:
+                    console.print("[red]Pilihan tidak valid, menggunakan default[/red]")
+            except ValueError:
+                console.print("[red]Input tidak valid, menggunakan default[/red]")
+        else:
+            self.input_custom_ip()
+        
+        # Konfirmasi target
+        console.print(f"\n[bold blue]Target yang akan diserang:[/bold blue] {self.target_host}:{self.target_port}")
+        confirm = input("Apakah Anda yakin dengan target ini? (y/N): ")
+        if confirm.lower() != 'y':
+            console.print("[yellow]Target dibatalkan, kembali ke default[/yellow]")
+            self.target_host = config.SIMULATOR_CONFIG['target_host']
+    
+    def input_custom_ip(self):
+        """Input custom IP address"""
+        while True:
+            custom_ip = input("Masukkan IP target (contoh: 192.168.1.1): ").strip()
+            
+            # Validasi IP format
+            if self.is_valid_ip(custom_ip):
+                # Cek apakah IP berbahaya
+                if self.is_dangerous_ip(custom_ip):
+                    console.print(f"[red]❌ PERINGATAN: IP {custom_ip} berbahaya untuk testing![/red]")
+                    console.print("[red]IP ini bisa membuat sistem crash atau merusak jaringan![/red]")
+                    continue_choice = input("Apakah Anda tetap ingin melanjutkan? (y/N): ")
+                    if continue_choice.lower() != 'y':
+                        continue
+                
+                self.target_host = custom_ip
+                console.print(f"[green]✅ Custom IP diset: {custom_ip}[/green]")
+                break
+            else:
+                console.print("[red]❌ Format IP tidak valid! Gunakan format: xxx.xxx.xxx.xxx[/red]")
+    
+    def is_valid_ip(self, ip):
+        """Validasi format IP address"""
+        try:
+            parts = ip.split('.')
+            if len(parts) != 4:
+                return False
+            for part in parts:
+                if not part.isdigit() or not 0 <= int(part) <= 255:
+                    return False
+            return True
+        except:
+            return False
+    
+    def is_dangerous_ip(self, ip):
+        """Cek apakah IP berbahaya untuk testing"""
+        dangerous_patterns = [
+            '127.0.0.1',      # localhost
+            '::1',            # IPv6 localhost
+            '0.0.0.0',        # all interfaces
+            '255.255.255.255', # broadcast
+        ]
+        
+        # Cek localhost ranges
+        if ip.startswith('127.'):
+            return True
+        
+        # Cek private network ranges yang bisa berbahaya
+        if ip.startswith('10.') or ip.startswith('192.168.') or ip.startswith('172.'):
+            # Tanya user untuk konfirmasi
+            return False  # Allow dengan warning
+        
+        return False
+    
+    def select_port(self):
+        """Pilih port target secara interaktif"""
+        console.print("\n[bold cyan]=== PILIH PORT TARGET ===[/bold cyan]")
+        
+        # Tampilkan pilihan port umum
+        if self.common_ports:
+            console.print("[bold green]Port yang umum untuk testing:[/bold green]")
+            for i, port in enumerate(self.common_ports, 1):
+                service_name = self.get_service_name(port)
+                console.print(f"{i}. Port {port} ({service_name})")
+            console.print(f"{len(self.common_ports) + 1}. Custom Port (input manual)")
+            console.print(f"{len(self.common_ports) + 2}. Gunakan default ({self.target_port})")
+            
+            choice = input(f"\nPilihan Anda (1-{len(self.common_ports) + 2}): ")
+            
+            try:
+                choice_num = int(choice)
+                if 1 <= choice_num <= len(self.common_ports):
+                    self.target_port = self.common_ports[choice_num - 1]
+                    service_name = self.get_service_name(self.target_port)
+                    console.print(f"[green]✅ Port dipilih: {self.target_port} ({service_name})[/green]")
+                elif choice_num == len(self.common_ports) + 1:
+                    self.input_custom_port()
+                elif choice_num == len(self.common_ports) + 2:
+                    console.print(f"[blue]Menggunakan default port: {self.target_port}[/blue]")
+                else:
+                    console.print("[red]Pilihan tidak valid, menggunakan default[/red]")
+            except ValueError:
+                console.print("[red]Input tidak valid, menggunakan default[/red]")
+        else:
+            self.input_custom_port()
+    
+    def input_custom_port(self):
+        """Input custom port"""
+        while True:
+            try:
+                custom_port = input("Masukkan port target (1-65535): ").strip()
+                port_num = int(custom_port)
+                
+                if 1 <= port_num <= 65535:
+                    # Cek port yang berbahaya
+                    if self.is_dangerous_port(port_num):
+                        console.print(f"[red]❌ PERINGATAN: Port {port_num} berbahaya untuk testing![/red]")
+                        console.print("[red]Port ini bisa membuat sistem crash atau merusak layanan![/red]")
+                        continue_choice = input("Apakah Anda tetap ingin melanjutkan? (y/N): ")
+                        if continue_choice.lower() != 'y':
+                            continue
+                    
+                    self.target_port = port_num
+                    service_name = self.get_service_name(port_num)
+                    console.print(f"[green]✅ Custom port diset: {port_num} ({service_name})[/green]")
+                    break
+                else:
+                    console.print("[red]❌ Port harus antara 1-65535![/red]")
+            except ValueError:
+                console.print("[red]❌ Port harus berupa angka![/red]")
+    
+    def is_dangerous_port(self, port):
+        """Cek apakah port berbahaya untuk testing"""
+        dangerous_ports = [
+            22,    # SSH - bisa disconnect user
+            23,    # Telnet - bisa disconnect user
+            3389,  # RDP - bisa disconnect user
+            5900,  # VNC - bisa disconnect user
+            22,    # SSH - bisa disconnect user
+        ]
+        
+        return port in dangerous_ports
+    
+    def get_service_name(self, port):
+        """Dapatkan nama service berdasarkan port"""
+        service_names = {
+            20: 'FTP-DATA', 21: 'FTP', 22: 'SSH', 23: 'TELNET', 25: 'SMTP',
+            53: 'DNS', 80: 'HTTP', 110: 'POP3', 143: 'IMAP', 443: 'HTTPS',
+            993: 'IMAPS', 995: 'POP3S', 1433: 'MSSQL', 3306: 'MySQL',
+            3389: 'RDP', 5432: 'PostgreSQL', 5900: 'VNC', 6379: 'Redis',
+            8080: 'HTTP-ALT', 8443: 'HTTPS-ALT', 27017: 'MongoDB'
+        }
+        
+        return service_names.get(port, 'Unknown')
     
     def syn_flood_attack(self):
         """Simulasi SYN Flood Attack"""
@@ -131,7 +311,15 @@ Connection: keep-alive\r
         """Memulai simulasi serangan"""
         self.show_banner()
         
-        console.print(f"[bold blue]Target:[/bold blue] {self.target_host}:{self.target_port}")
+        # Target selection jika dienable
+        if self.enable_target_selection:
+            self.select_target()
+        
+        # Port selection jika dienable
+        if self.enable_port_selection:
+            self.select_port()
+        
+        console.print(f"\n[bold blue]Target:[/bold blue] {self.target_host}:{self.target_port}")
         console.print(f"[bold blue]Durasi:[/bold blue] {self.duration} detik")
         console.print(f"[bold blue]Paket/detik:[/bold blue] {self.packets_per_second}")
         console.print(f"[bold blue]Tipe Serangan:[/bold blue] {attack_type}\n")

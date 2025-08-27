@@ -10,10 +10,29 @@ DDoS_THRESHOLDS = {
 
 # Konfigurasi simulator
 SIMULATOR_CONFIG = {
-    'target_host': '127.0.0.1',     # Hanya localhost untuk testing
+    'target_host': '192.168.1.1',   # Default target (bisa diubah saat runtime)
     'target_port': 80,               # Port target
     'attack_duration': 30,           # Durasi serangan dalam detik
     'packets_per_second': 50,        # Jumlah paket per detik
+    'enable_target_selection': True, # Enable pilihan target IP
+    'enable_port_selection': True,   # Enable pilihan port
+    'safe_targets': [                # IP yang aman untuk testing
+        '192.168.1.1',              # Router lokal
+        '192.168.1.254',            # Gateway lokal
+        '10.0.0.1',                 # Network lain
+        '172.16.0.1'                # Network lain
+    ],
+    'common_ports': [                # Port yang umum untuk testing
+        80,    # HTTP
+        443,   # HTTPS
+        22,    # SSH
+        21,    # FTP
+        25,    # SMTP
+        53,    # DNS
+        3389,  # RDP
+        8080,  # HTTP Alt
+        8443    # HTTPS Alt
+    ]
 }
 
 # Konfigurasi monitoring
