@@ -39,6 +39,8 @@ class DDoSSimulator:
         self.enable_target_selection = config.SIMULATOR_CONFIG['enable_target_selection']
         self.enable_port_selection = config.SIMULATOR_CONFIG['enable_port_selection']
         self.common_ports = config.SIMULATOR_CONFIG['common_ports']
+        self.enable_extreme_mode = config.SIMULATOR_CONFIG['enable_extreme_mode']
+        self.extreme_config = config.SIMULATOR_CONFIG['extreme_mode_config']
     
     def show_banner(self):
         """Menampilkan banner aplikasi"""
@@ -81,6 +83,14 @@ class DDoSSimulator:
         else:
             self.input_custom_ip()
         
+        # Final validation - BLOCK IP eksternal
+        if self.is_dangerous_ip(self.target_host):
+            console.print(f"\n[bold red]🚫 BLOCKED: Target {self.target_host} adalah IP EKSTERNAL![/bold red]")
+            console.print("[red]Sistem tidak mengizinkan attack ke IP eksternal untuk keamanan![/red]")
+            console.print("[yellow]Kembali ke default target yang aman...[/yellow]")
+            self.target_host = config.SIMULATOR_CONFIG['target_host']
+            return
+        
         # Konfirmasi target
         console.print(f"\n[bold blue]Target yang akan diserang:[/bold blue] {self.target_host}:{self.target_port}")
         confirm = input("Apakah Anda yakin dengan target ini? (y/N): ")
@@ -95,13 +105,13 @@ class DDoSSimulator:
             
             # Validasi IP format
             if self.is_valid_ip(custom_ip):
-                # Cek apakah IP berbahaya
+                # Cek apakah IP berbahaya - BLOCK TOTAL!
                 if self.is_dangerous_ip(custom_ip):
-                    console.print(f"[red]❌ PERINGATAN: IP {custom_ip} berbahaya untuk testing![/red]")
-                    console.print("[red]IP ini bisa membuat sistem crash atau merusak jaringan![/red]")
-                    continue_choice = input("Apakah Anda tetap ingin melanjutkan? (y/N): ")
-                    if continue_choice.lower() != 'y':
-                        continue
+                    console.print(f"[red]❌ BLOCKED: IP {custom_ip} adalah IP EKSTERNAL![/red]")
+                    console.print("[red]🚫 SISTEM TIDAK MENGIZINKAN ATTACK KE IP EKSTERNAL![/red]")
+                    console.print("[red]⚠️  Ini ILEGAL dan bisa berakibat hukum![/red]")
+                    console.print("[yellow]💡 Gunakan IP lokal: 192.168.x.x, 10.x.x.x, 172.16-31.x.x[/yellow]")
+                    continue
                 
                 self.target_host = custom_ip
                 console.print(f"[green]✅ Custom IP diset: {custom_ip}[/green]")
@@ -125,17 +135,21 @@ class DDoSSimulator:
     def is_dangerous_ip(self, ip):
         """Cek apakah IP berbahaya untuk testing"""
         dangerous_patterns = [
-            '127.0.0.1',      # localhost
             '::1',            # IPv6 localhost
             '0.0.0.0',        # all interfaces
             '255.255.255.255', # broadcast
         ]
         
-        # Cek localhost ranges
+        # Cek localhost ranges - Allow jika mode ekstrem aktif
         if ip.startswith('127.'):
-            return True
+            if self.enable_extreme_mode and self.extreme_config['enable_localhost']:
+                console.print(f"[yellow]⚠️  PERINGATAN: IP {ip} adalah localhost![/yellow]")
+                console.print("[yellow]Mode ekstrem mengizinkan localhost untuk testing intensif![/yellow]")
+                return False  # Allow localhost di mode ekstrem
+            else:
+                return True  # Block localhost di mode normal
         
-        # Cek IP eksternal (public IP) - BLOCK!
+        # Cek IP eksternal (public IP) - BLOCK TOTAL!
         if not (ip.startswith('10.') or ip.startswith('192.168.') or ip.startswith('172.')):
             console.print(f"[red]❌ PERINGATAN: IP {ip} adalah IP PUBLIK/EKSTERNAL![/red]")
             console.print("[red]JANGAN PERNAH attack IP eksternal - ini ILEGAL![/red]")
@@ -143,7 +157,6 @@ class DDoSSimulator:
         
         # Cek private network ranges yang aman
         if ip.startswith('10.') or ip.startswith('192.168.') or ip.startswith('172.'):
-            # Tanya user untuk konfirmasi
             return False  # Allow dengan warning
         
         return True  # Default block
@@ -291,6 +304,117 @@ class DDoSSimulator:
         console.print(f"  Durasi: {self.duration} detik")
         console.print(f"  Paket/detik: {self.packets_per_second}")
         console.print(f"  Jumlah Bot: {self.number_of_bots}")
+        
+        # Mode ekstrem jika dienable
+        if self.enable_extreme_mode:
+            self.configure_extreme_mode()
+    
+    def configure_extreme_mode(self):
+        """Konfigurasi mode ekstrem untuk testing intensif"""
+        console.print("\n[bold red]🔥 === MODE EKSTREM AKTIF === 🔥[/bold red]")
+        console.print("[yellow]⚠️  PERINGATAN: Mode ini untuk testing intensif lokal saja![/yellow]")
+        console.print("[red]🚫 JANGAN PERNAH gunakan untuk IP eksternal![/red]\n")
+        
+        # Pilihan mode ekstrem
+        console.print("[bold cyan]Pilih Mode Ekstrem:[/bold cyan]")
+        console.print("1. 🚀 Turbo Mode - 5000 pps, 20 bot, 60 detik")
+        console.print("2. 💥 Nuclear Mode - 10000 pps, 50 bot, 120 detik")
+        console.print("3. 🌪️  Tornado Mode - 8000 pps, 30 bot, 90 detik")
+        console.print("4. ⚡ Lightning Mode - 15000 pps, 40 bot, 60 detik")
+        console.print("5. 🎯 Custom Extreme - Konfigurasi manual")
+        console.print("6. ❌ Skip Mode Ekstrem")
+        
+        choice = input("\nPilihan Mode Ekstrem (1-6): ")
+        
+        if choice == "1":  # Turbo Mode
+            self.duration = 60
+            self.packets_per_second = 5000
+            self.number_of_bots = 20
+            console.print("[green]🚀 Turbo Mode Aktif![/green]")
+            
+        elif choice == "2":  # Nuclear Mode
+            self.duration = 120
+            self.packets_per_second = 10000
+            self.number_of_bots = 50
+            console.print("[red]💥 Nuclear Mode Aktif![/red]")
+            
+        elif choice == "3":  # Tornado Mode
+            self.duration = 90
+            self.packets_per_second = 8000
+            self.number_of_bots = 30
+            console.print("[yellow]🌪️  Tornado Mode Aktif![/yellow]")
+            
+        elif choice == "4":  # Lightning Mode
+            self.duration = 60
+            self.packets_per_second = 15000
+            self.number_of_bots = 40
+            console.print("[blue]⚡ Lightning Mode Aktif![/blue]")
+            
+        elif choice == "5":  # Custom Extreme
+            self.configure_custom_extreme()
+            
+        else:
+            console.print("[blue]Mode ekstrem dilewati[/blue]")
+        
+        # Tampilkan konfigurasi ekstrem
+        if choice in ["1", "2", "3", "4", "5"]:
+            console.print(f"\n[bold red]🔥 KONFIGURASI EKSTREM:[/bold red]")
+            console.print(f"  Durasi: {self.duration} detik")
+            console.print(f"  Paket/detik: {self.packets_per_second:,}")
+            console.print(f"  Jumlah Bot: {self.number_of_bots}")
+            console.print(f"  Total Paket: {self.duration * self.packets_per_second * self.number_of_bots:,}")
+    
+    def configure_custom_extreme(self):
+        """Konfigurasi custom mode ekstrem"""
+        console.print("\n[bold red]🎯 === CUSTOM EXTREME MODE === 🎯[/bold red]")
+        
+        # Durasi ekstrem
+        while True:
+            try:
+                duration_input = input(f"Durasi ekstrem (1-{self.extreme_config['max_duration']} detik): ").strip()
+                if duration_input:
+                    new_duration = int(duration_input)
+                    if 1 <= new_duration <= self.extreme_config['max_duration']:
+                        self.duration = new_duration
+                        break
+                    else:
+                        console.print(f"[red]❌ Durasi harus 1-{self.extreme_config['max_duration']} detik![/red]")
+                else:
+                    break
+            except ValueError:
+                console.print("[red]❌ Durasi harus berupa angka![/red]")
+        
+        # Paket per detik ekstrem
+        while True:
+            try:
+                pps_input = input(f"Paket ekstrem (1-{self.extreme_config['max_packets_per_second']:,} pps): ").strip()
+                if pps_input:
+                    new_pps = int(pps_input)
+                    if 1 <= new_pps <= self.extreme_config['max_packets_per_second']:
+                        self.packets_per_second = new_pps
+                        break
+                    else:
+                        console.print(f"[red]❌ Paket harus 1-{self.extreme_config['max_packets_per_second']:,} pps![/red]")
+                else:
+                    break
+            except ValueError:
+                console.print("[red]❌ Paket harus berupa angka![/red]")
+        
+        # Jumlah bot ekstrem
+        while True:
+            try:
+                bots_input = input(f"Bot ekstrem (1-{self.extreme_config['max_bots']}): ").strip()
+                if bots_input:
+                    new_bots = int(bots_input)
+                    if 1 <= new_bots <= self.extreme_config['max_bots']:
+                        self.number_of_bots = new_bots
+                        break
+                    else:
+                        console.print(f"[red]❌ Bot harus 1-{self.extreme_config['max_bots']}![/red]")
+                else:
+                    break
+            except ValueError:
+                console.print("[red]❌ Bot harus berupa angka![/red]")
     
     def syn_flood_attack(self, bot_name="SYN-Bot"):
         """Simulasi SYN Flood Attack"""
@@ -393,6 +517,14 @@ Connection: keep-alive\r
         
         # Konfigurasi attack parameters
         self.configure_attack_parameters()
+        
+        # Final security check - BLOCK IP eksternal
+        if self.is_dangerous_ip(self.target_host):
+            console.print(f"\n[bold red]🚫 BLOCKED: Target {self.target_host} adalah IP EKSTERNAL![/bold red]")
+            console.print("[red]Sistem tidak mengizinkan attack ke IP eksternal untuk keamanan![/red]")
+            console.print("[yellow]Kembali ke default target yang aman...[/yellow]")
+            self.target_host = config.SIMULATOR_CONFIG['target_host']
+            return
         
         console.print(f"\n[bold blue]Target:[/bold blue] {self.target_host}:{self.target_port}")
         console.print(f"[bold blue]Durasi:[/bold blue] {self.duration} detik")

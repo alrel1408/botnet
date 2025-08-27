@@ -16,11 +16,13 @@ SIMULATOR_CONFIG = {
     'packets_per_second': 50,        # Jumlah paket per detik
     'enable_target_selection': True, # Enable pilihan target IP
     'enable_port_selection': True,   # Enable pilihan port
+    'enable_extreme_mode': True,     # Enable mode ekstrem
     'safe_targets': [                # IP yang aman untuk testing
         '192.168.1.1',              # Router lokal
         '192.168.1.254',            # Gateway lokal
         '10.0.0.1',                 # Network lain
-        '172.16.0.1'                # Network lain
+        '172.16.0.1',               # Network lain
+        '127.0.0.1'                 # Localhost (untuk mode ekstrem)
     ],
     'common_ports': [                # Port yang umum untuk testing
         80,    # HTTP
@@ -31,8 +33,20 @@ SIMULATOR_CONFIG = {
         53,    # DNS
         3389,  # RDP
         8080,  # HTTP Alt
-        8443    # HTTPS Alt
-    ]
+        8443,  # HTTPS Alt
+        3000,  # Node.js
+        5000,  # Flask
+        8000,  # Django
+        9000   # Custom
+    ],
+    'extreme_mode_config': {         # Konfigurasi mode ekstrem
+        'max_duration': 7200,       # 2 jam max
+        'max_packets_per_second': 10000,  # 10K paket/detik
+        'max_bots': 50,             # 50 bot max
+        'enable_localhost': True,   # Allow localhost untuk testing
+        'enable_aggressive_timing': True,  # Timing agresif
+        'enable_massive_payloads': True    # Payload besar
+    }
 }
 
 # Konfigurasi monitoring
